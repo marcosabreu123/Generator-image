@@ -215,7 +215,22 @@ export default function App() {
       }
     } catch (err: any) {
       console.error(err);
-      setState(prev => ({ ...prev, error: `Erro ao conversar com o assistente: ${err.message || "Verifique sua API Key."}` }));
+      let errorMessage = err.message || "Verifique sua API Key.";
+      
+      // Tratamento amigável para erros de sobrecarga do servidor do Google
+      if (errorMessage.includes("503") || errorMessage.includes("high demand") || errorMessage.includes("UNAVAILABLE")) {
+        errorMessage = "O servidor do Google Gemini está temporariamente sobrecarregado devido à alta demanda. Por favor, aguarde alguns instantes e tente novamente.";
+      } else if (errorMessage.includes("{")) {
+        // Tenta limpar mensagens de erro em JSON bruto
+        try {
+          const parsed = JSON.parse(errorMessage.substring(errorMessage.indexOf("{")));
+          if (parsed.error && parsed.error.message) {
+            errorMessage = parsed.error.message;
+          }
+        } catch (e) {}
+      }
+
+      setState(prev => ({ ...prev, error: `Erro ao conversar com o assistente: ${errorMessage}` }));
     }
   };
 
