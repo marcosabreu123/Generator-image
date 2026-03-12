@@ -8,38 +8,32 @@ import { BrandGuidelines, GenerationTemplate, AspectRatio, ChatMessage } from ".
 import { ANALYSIS_SYSTEM_INSTRUCTION, PRESETS } from "../constants";
 
 const ASSISTANT_SYSTEM_INSTRUCTION = `
-[ROLE]
-Estrategista de Marketing e Diretor de Arte (BrandGenius AI). Foco: criar anúncios de alta conversão para lojistas.
+[PERSONA]
+Você é um Diretor de Arte Sênior e Estrategista de Marketing Especializado em Performance. Seu objetivo não é apenas gerar imagens, mas criar peças publicitárias de luxo que convertem visualizações em vendas. Você é elegante, assertivo, minimalista e mentor do seu cliente.
 
-[UX & LAYOUT]
-- Opere em 3 colunas. Respostas curtas e objetivas em PT-BR.
-- Após gerar, diga: "Variações disponíveis na galeria à direita".
-- Identifique "Excluir/Limpar" como reset de contexto.
+[REGRAS DE COMUNICAÇÃO (OBRIGATÓRIAS)]
+1. Idioma: Fale 100% do tempo em Português (PT-BR).
+2. Proibido Tecniquês: Nunca mostre termos técnicos de prompts em inglês (como "photorealistic", "8k", "lighting") para o usuário. Guarde-os para o comando interno.
+3. Poder de Síntese: Não dê respostas gigantescas. Seja direto, mas profissional.
 
-[FLUXO INICIAL - OBRIGATÓRIO]
-Siga este roteiro para novos anúncios, uma pergunta por vez:
-1. O que vamos vender? (Aguarde resposta).
-2. Extração de Marca: Peça a Logo/Referência para o painel lateral. Se o usuário já anexou, confirme a extração de cores.
-3. Desejo & Público: Pergunte a "vibe" (Ex: suculento/familiar) e quem é o cliente.
+[PROTOCOLO DE BRIEFING E BLOQUEIO (NÃO PULE ETAPAS)]
+Você está proibido de gerar o comando [READY_TO_GENERATE] antes de ter clareza total sobre o anúncio. Se o usuário for vago, você deve fazer perguntas estratégicas, uma de cada vez ou em blocos curtos, focando em:
+• O Protagonista: O que é o produto? (Textura, material, ângulo principal).
+• O Público/Vibe: Para quem é? (Sofisticado, jovem, rústico, tecnológico?). Se as diretrizes da marca tiverem uma "vibe", use-a como base.
+• A Proposta: Qual o diferencial? (É refrescante? É luxuoso? É rápido?).
+• Identidade: Se não houver análise de logo anterior, insista para que ele descreva as cores da marca.
+• Textos: Se as diretrizes da marca contiverem "extractedText" (textos extraídos das imagens de referência), sugira usá-los no anúncio ou pergunte se o usuário quer alterar o texto.
 
-[MOTOR DE ITERAÇÃO UNIVERSAL]
-Regra de Ouro: Toda "nova versão" solicitada pelo usuário deve ser tratada como uma evolução da imagem anterior, e não como um novo começo.
-Elementos Intocáveis: Mantenha sempre a posição dos logotipos, o idioma (PT-BR), os elementos de interface (como celulares ou botões de compra) e a paleta de cores da marca extraída no início.
+[LÓGICA DE DIREÇÃO DE ARTE]
+• Estética: Evite o visual "clichê de IA". Busque composições de fotografia de estúdio real, profundidade de campo (bokeh), iluminação dramática e ângulos de câmera profissionais (low angle, macro, etc).
+• Consistência: Se o usuário pedir alterações, mantenha a essência do produto e mude apenas o cenário ou iluminação.
 
-[LÓGICA DE ALTERAÇÃO POR CAMADAS]
-- Se o usuário pedir para mudar o "fundo" ou o "estilo", aplique a mudança apenas na camada de cenário (background).
-- Se o usuário pedir para mudar o "produto", substitua apenas o objeto central, mantendo o layout de design e as fontes de texto já aprovadas.
-
-[COMANDO DE DISPARO TÉCNICO]
-Ao gerar o prompt para o Nano Banana 2 (Gemini 3 Flash Image), estruture-o assim:
-Base Fixa: "Maintain layout structure from previous version: [DESCREVER ELEMENTOS QUE FICAM]".
-Nova Modificação: "Apply new style/background/object: [DESCREVER A MUDANÇA]".
-Qualidade: "High-end commercial photography, 8k, photorealistic".
-
-[INTERAÇÃO COM O USUÁRIO]
-- Respostas curtas e diretas em PT-BR.
-- Confirme o que será mantido antes de gerar: "Vou manter seu logo e o celular, mas vou trocar o fundo branco por um estilo de hamburgueria rústica, ok?".
-- Ao ter os dados ou confirmar a iteração, dê uma dica de marketing e finalize com: [READY_TO_GENERATE] + (Descrição estruturada do anúncio).
+[EXECUÇÃO DO COMANDO INTERNO]
+Somente após o briefing estar completo e você dar uma "Dica de Mestre" de marketing, você deve liberar a arte.
+Use exatamente este formato:
+1. Uma frase curta confirmando a criação.
+2. Uma dica de marketing rápida.
+3. A tag: [READY_TO_GENERATE] seguida de um prompt ultra-detalhado EM INGLÊS, focado em fotografia publicitária de alto nível (high-end advertising photography).
 `;
 
 const PROMPT_REFINEMENT_INSTRUCTION = `
@@ -50,20 +44,59 @@ Sua tarefa é transformar a ideia do usuário em um prompt técnico de alta perf
 REGRAS:
 1. Linguagem: O prompt enviado à IA de imagem deve ser em Inglês para maior precisão.
 2. Qualidade: Use termos como: Cinematic lighting, 8k resolution, commercial photography, studio quality, high-end advertising.
-3. Identidade: Se houver diretrizes de marca (cores [HEX], estilo de fonte), inclua instruções para preservá-las.
-4. Texto na Imagem: Garanta que o texto solicitado seja curto e legível (ex: "Rodízio R$ 39,90", "Promoção de Verão"). O texto na imagem deve ser em Português (PT-BR).
-5. Estilo: Escolha o melhor estilo (Minimalista, Editorial ou Digital Moderno) com base no produto.
+3. Identidade: Se houver diretrizes de marca (cores [HEX], estilo de fonte, vibe), inclua instruções para preservá-las e manter a mesma abordagem/vibe.
+4. Texto na Imagem: Se houver "extractedText" nas diretrizes de marca ou se o usuário pedir texto, OBRIGATORIAMENTE inclua instruções para a IA renderizar esse texto na imagem. O texto deve ser em Português (PT-BR) e estar entre aspas duplas no prompt em inglês (ex: with the text "Promoção de Verão" written in bold typography).
+5. Estilo: Escolha o melhor estilo (Minimalista, Editorial ou Digital Moderno) com base no produto e na vibe extraída.
 
 Retorne APENAS o prompt refinado em inglês.
 `;
 
 export class GeminiService {
+  private cachedContextName: string | null = null;
+  private cachedGuidelinesStr: string | null = null;
+
   /**
    * Inicializa o SDK do Gemini com a chave mais recente.
    */
   private getClient(): GoogleGenAI {
-    const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || "";
+    // Para Netlify/Vite usamos import.meta.env.VITE_GEMINI_API_KEY
+    // Para o ambiente AI Studio usamos process.env.API_KEY
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.API_KEY || process.env.GEMINI_API_KEY || "";
     return new GoogleGenAI({ apiKey });
+  }
+
+  /**
+   * Cria ou recupera o cache de contexto para as diretrizes da marca.
+   */
+  private async getOrCreateCache(guidelines: BrandGuidelines | null): Promise<string | undefined> {
+    if (!guidelines) return undefined;
+    
+    const guidelinesStr = JSON.stringify(guidelines);
+    if (this.cachedContextName && this.cachedGuidelinesStr === guidelinesStr) {
+      return this.cachedContextName;
+    }
+
+    const ai = this.getClient();
+    try {
+      const cache = await ai.caches.create({
+        model: "gemini-3-flash-preview",
+        config: {
+          systemInstruction: PROMPT_REFINEMENT_INSTRUCTION,
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: `Diretrizes da Marca para todos os próximos anúncios: ${guidelinesStr}` }]
+            }
+          ]
+        }
+      });
+      this.cachedContextName = cache.name;
+      this.cachedGuidelinesStr = guidelinesStr;
+      return cache.name;
+    } catch (e) {
+      console.error("Erro ao criar cache de contexto:", e);
+      return undefined;
+    }
   }
 
   /**
@@ -93,12 +126,18 @@ export class GeminiService {
     console.log("Iniciando análise de imagens...");
     const ai = this.getClient();
     
-    const imageParts = base64Images.map(img => ({
-      inlineData: {
-        mimeType: "image/jpeg",
-        data: img.split(",")[1] || img,
-      },
-    }));
+    const imageParts = base64Images.map(img => {
+      const mimeTypeMatch = img.match(/^data:(image\/[a-zA-Z+]+);base64,/);
+      const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : "image/jpeg";
+      const data = img.includes(",") ? img.split(",")[1] : img;
+      
+      return {
+        inlineData: {
+          mimeType,
+          data,
+        },
+      };
+    });
 
     try {
       const response = await ai.models.generateContent({
@@ -129,6 +168,15 @@ export class GeminiService {
                 type: Type.STRING,
                 description: "Market segment",
               },
+              extractedText: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+                description: "Any readable text found in the images",
+              },
+              vibe: {
+                type: Type.STRING,
+                description: "The general vibe or approach of the ad",
+              },
             },
             required: ["colors", "fontStyle", "segment"],
           },
@@ -149,21 +197,40 @@ export class GeminiService {
   async refinePrompt(prompt: string, guidelines: BrandGuidelines | null): Promise<string> {
     const ai = this.getClient();
     
-    const content = `Ideia do Anúncio: ${prompt}. ${guidelines ? `Diretrizes da Marca: ${JSON.stringify(guidelines)}` : ''}`;
+    const cachedContentName = await this.getOrCreateCache(guidelines);
     
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: content,
-      config: {
+    const content = `Ideia do Anúncio: ${prompt}.`;
+    
+    const config: any = {};
+    if (cachedContentName) {
+      config.cachedContent = cachedContentName;
+    } else {
+      config.systemInstruction = PROMPT_REFINEMENT_INSTRUCTION;
+    }
+
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: content,
+        config,
+      });
+      return response.text || prompt;
+    } catch (e: any) {
+      console.warn("Erro ao refinar prompt com cache, tentando sem cache:", e);
+      const fallbackConfig = {
         systemInstruction: PROMPT_REFINEMENT_INSTRUCTION,
-      }
-    });
-    
-    return response.text || prompt;
+      };
+      const fallbackResponse = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: content,
+        config: fallbackConfig,
+      });
+      return fallbackResponse.text || prompt;
+    }
   }
 
   /**
-   * Gera imagens usando o modelo Nano Banana 2 (gemini-3.1-flash-image-preview).
+   * Gera imagens usando o modelo Nano Banana (gemini-2.5-flash-image).
    */
   async generateImages(
     prompt: string,
@@ -185,28 +252,32 @@ export class GeminiService {
       
       // Adicionar até 3 imagens de referência
       referenceImages.slice(0, 3).forEach(img => {
+        const mimeTypeMatch = img.match(/^data:(image\/[a-zA-Z+]+);base64,/);
+        const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : "image/jpeg";
+        const data = img.includes(",") ? img.split(",")[1] : img;
+        
         parts.push({
           inlineData: {
-            mimeType: "image/jpeg",
-            data: img.split(",")[1] || img,
+            mimeType,
+            data,
           },
         });
       });
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.1-flash-image-preview",
+        model: "gemini-2.5-flash-image",
         contents: { parts },
         config: {
           imageConfig: {
             aspectRatio: aspectRatio,
-            imageSize: "1K",
           },
         },
       });
 
       for (const part of response.candidates?.[0]?.content?.parts || []) {
         if (part.inlineData) {
-          results.push(`data:image/png;base64,${part.inlineData.data}`);
+          const mimeType = part.inlineData.mimeType || "image/png";
+          results.push(`data:${mimeType};base64,${part.inlineData.data}`);
         }
       }
     }

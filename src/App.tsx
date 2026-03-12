@@ -9,7 +9,6 @@ import {
   Upload, 
   Download, 
   RefreshCw, 
-  Settings, 
   Palette, 
   Type as TypeIcon, 
   Layers, 
@@ -20,27 +19,26 @@ import {
   ChevronRight,
   Sparkles,
   Zap,
-  Layout
+  Layout,
+  Plus,
+  LogOut,
+  ShieldAlert
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import JSZip from "jszip";
 import { GeminiService } from "./services/gemini";
 import { BrandGuidelines, GeneratedImage, GenerationState, AspectRatio, ChatMessage } from "./types";
 import { PRESETS } from "./constants";
-
-// Extend window for AI Studio API
-declare global {
-  interface Window {
-    aistudio: {
-      hasSelectedApiKey: () => Promise<boolean>;
-      openSelectKey: () => Promise<void>;
-    };
-  }
-}
+import { supabase } from "./lib/supabase";
+import { Auth } from "./components/Auth";
+import { AdminDashboard } from "./components/AdminDashboard";
+import { Session } from "@supabase/supabase-js";
 
 export default function App() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [currentView, setCurrentView] = useState<"app" | "admin">("app");
   const [chatInput, setChatInput] = useState("");
-  const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("1:1");
@@ -63,36 +61,54 @@ export default function App() {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    checkApiKey();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session?.user) checkRole(session.user.id);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session?.user) {
+        checkRole(session.user.id);
+      } else {
+        setIsAdmin(false);
+        setCurrentView("app");
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
+
+  const checkRole = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single();
+      
+      if (error) throw error;
+      
+      console.log('Sua role é:', data?.role);
+      
+      if (data && data.role?.toLowerCase() === 'admin') {
+        setIsAdmin(true);
+      } else {
+        setIsAdmin(false);
+        if (currentView === 'admin') setCurrentView('app');
+      }
+    } catch (err) {
+      console.error("Erro ao verificar role:", err);
+      setIsAdmin(false);
+      if (currentView === 'admin') setCurrentView('app');
+    }
+  };
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [state.chatHistory]);
-
-  const checkApiKey = async () => {
-    if (window.aistudio) {
-      const hasKey = await window.aistudio.hasSelectedApiKey();
-      setHasApiKey(hasKey);
-    } else {
-      setHasApiKey(true);
-    }
-  };
-
-  const handleOpenKeyDialog = async () => {
-    if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
-      try {
-        await window.aistudio.openSelectKey();
-        setHasApiKey(true);
-        setState(prev => ({ ...prev, error: null }));
-      } catch (err: any) {
-        console.error("Erro ao abrir seletor:", err);
-        setState(prev => ({ ...prev, error: "Não foi possível abrir o seletor de projetos." }));
-      }
-    } else {
-      setHasApiKey(true);
-    }
-  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -127,11 +143,19 @@ export default function App() {
       setGuidelines(result);
       
       // Notificar o usuário no chat
+      let notificationText = "Recebi suas imagens! Já extraí a identidade visual (cores e estilo) para garantir que o anúncio siga sua marca.";
+      if (result.extractedText && result.extractedText.length > 0) {
+        notificationText += ` Também identifiquei os seguintes textos: "${result.extractedText.join('", "')}".`;
+      }
+      if (result.vibe) {
+        notificationText += ` A vibe geral parece ser: ${result.vibe}.`;
+      }
+
       setState(prev => ({
         ...prev,
         chatHistory: [
           ...prev.chatHistory,
-          { role: "model", text: "Recebi suas imagens! Já extraí a identidade visual (cores e estilo) para garantir que o anúncio siga sua marca." }
+          { role: "model", text: notificationText }
         ]
       }));
     } catch (err: any) {
@@ -177,7 +201,7 @@ export default function App() {
     try {
       if (!geminiService.current) geminiService.current = new GeminiService();
       
-      const response = await geminiService.current.chat(userMessage, updatedHistory, guidelines);
+      const response = await geminiService.current.chat(userMessage, state.chatHistory, guidelines);
       
       setState(prev => ({
         ...prev,
@@ -195,6 +219,96 @@ export default function App() {
     }
   };
 
+  const loadGallery = async () => {
+    if (!session?.user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('creations')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false });
+        
+      if (error) throw error;
+      
+      if (data) {
+        const loadedResults: GeneratedImage[] = data.map(item => ({
+          id: item.id,
+          url: item.image_url,
+          prompt: item.prompt_text,
+          timestamp: new Date(item.created_at).getTime()
+        }));
+        
+        setState(prev => ({
+          ...prev,
+          results: loadedResults
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading gallery:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (session) {
+      loadGallery();
+    }
+  }, [session]);
+
+  const saveToDatabase = async (base64Url: string, promptText: string) => {
+    if (!session?.user) return null;
+    
+    try {
+      // 1. Convert base64 to blob
+      const base64Data = base64Url.split(',')[1];
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'image/png' });
+
+      // 2. Upload to storage
+      const fileName = `${session.user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.png`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('creations-images')
+        .upload(fileName, blob, {
+          contentType: 'image/png'
+        });
+
+      if (uploadError) throw uploadError;
+
+      // 3. Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('creations-images')
+        .getPublicUrl(fileName);
+
+      // 4. Insert into creations table
+      const { data: insertData, error: insertError } = await supabase
+        .from('creations')
+        .insert({
+          user_id: session.user.id,
+          prompt_text: promptText,
+          image_url: publicUrl
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      return {
+        id: insertData.id,
+        url: publicUrl,
+        prompt: promptText,
+        timestamp: new Date(insertData.created_at).getTime()
+      };
+    } catch (error) {
+      console.error('Error saving to database:', error);
+      return null;
+    }
+  };
+
   const generate = async (generationPrompt: string) => {
     setState(prev => ({ ...prev, isGenerating: true, progress: 0, error: null }));
     
@@ -209,12 +323,25 @@ export default function App() {
         quantity
       );
 
-      const newResults: GeneratedImage[] = urls.map(url => ({
-        id: Math.random().toString(36).substring(7),
-        url,
-        prompt: generationPrompt,
-        timestamp: Date.now(),
-      }));
+      if (urls.length === 0) {
+        throw new Error("O assistente não conseguiu gerar a imagem. Pode ter sido bloqueado por filtros de segurança ou o prompt foi inválido.");
+      }
+
+      const newResults: GeneratedImage[] = [];
+      
+      for (const url of urls) {
+        const saved = await saveToDatabase(url, generationPrompt);
+        if (saved) {
+          newResults.push(saved);
+        } else {
+          newResults.push({
+            id: Math.random().toString(36).substring(7),
+            url,
+            prompt: generationPrompt,
+            timestamp: Date.now(),
+          });
+        }
+      }
 
       setState(prev => ({
         ...prev,
@@ -224,10 +351,9 @@ export default function App() {
     } catch (err: any) {
       console.error(err);
       if (err.message?.includes("Requested entity was not found")) {
-        setHasApiKey(false);
-        setState(prev => ({ ...prev, error: "API Key expirada ou inválida. Por favor, selecione novamente." }));
+        setState(prev => ({ ...prev, error: "API Key expirada ou inválida. Verifique suas configurações." }));
       } else {
-        setState(prev => ({ ...prev, error: "Erro ao gerar imagem. Tente novamente." }));
+        setState(prev => ({ ...prev, error: err.message || "Erro ao gerar imagem. Tente novamente." }));
       }
     } finally {
       setState(prev => ({ ...prev, isGenerating: false }));
@@ -263,39 +389,26 @@ export default function App() {
     setState(prev => ({ ...prev, results: [] }));
   };
 
-  if (hasApiKey === false) {
-    return (
-      <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center p-6 text-center">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="max-w-md w-full bg-neutral-900 border border-neutral-800 rounded-3xl p-8 shadow-2xl"
-        >
-          <div className="w-16 h-16 bg-emerald-500/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <Zap className="text-emerald-500 w-8 h-8" />
-          </div>
-          <h1 className="text-2xl font-bold text-white mb-4">Configuração Necessária</h1>
-          <p className="text-neutral-400 mb-8 leading-relaxed">
-            Para utilizar o modelo <span className="text-emerald-400 font-mono">Nano Banana 2</span> (Gemini 3.1 Flash Image), você precisa selecionar uma API Key de um projeto Google Cloud com faturamento ativo.
-          </p>
-          <button
-            onClick={handleOpenKeyDialog}
-            className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-bold rounded-2xl transition-all flex items-center justify-center gap-2 group"
-          >
-            Selecionar API Key
-            <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-          </button>
-          <a 
-            href="https://ai.google.dev/gemini-api/docs/billing" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="mt-6 inline-flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-300 transition-colors"
-          >
-            Saiba mais sobre faturamento <ExternalLink className="w-3 h-3" />
-          </a>
-        </motion.div>
-      </div>
-    );
+  const handleNewChat = () => {
+    setState(prev => ({
+      ...prev,
+      chatHistory: [
+        { role: "model", text: "Olá! Sou seu Estrategista de Marketing e Diretor de Arte. O que vamos vender hoje?" }
+      ],
+      results: [],
+      error: null,
+      progress: 0,
+    }));
+    setReferenceImages([]);
+    setGuidelines(null);
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
+
+  if (!session) {
+    return <Auth />;
   }
 
   return (
@@ -311,6 +424,22 @@ export default function App() {
         
         <div className="flex items-center gap-4">
           <div className="hidden md:flex items-center gap-4">
+            {isAdmin && (
+              <button 
+                onClick={() => setCurrentView(currentView === 'admin' ? 'app' : 'admin')}
+                className="flex items-center gap-2 px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-xl text-sm font-medium transition-all"
+              >
+                <ShieldAlert className="w-4 h-4" />
+                {currentView === 'admin' ? 'Voltar ao App' : 'Dashboard Admin'}
+              </button>
+            )}
+            <button 
+              onClick={handleNewChat}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 rounded-xl text-sm font-bold transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              Novo Chat
+            </button>
             {state.results.length > 0 && (
               <button 
                 onClick={downloadBatch}
@@ -321,25 +450,45 @@ export default function App() {
               </button>
             )}
             <button 
-              onClick={handleOpenKeyDialog}
-              className="p-2 text-neutral-400 hover:text-white transition-colors"
-              title="Alterar API Key"
+              onClick={handleLogout}
+              className="p-2 text-red-400 hover:text-red-300 transition-colors"
+              title="Sair"
             >
-              <Settings className="w-5 h-5" />
+              <LogOut className="w-5 h-5" />
             </button>
           </div>
+          {isAdmin && (
+            <button 
+              onClick={() => setCurrentView(currentView === 'admin' ? 'app' : 'admin')}
+              className="md:hidden p-2 text-neutral-400 hover:text-white transition-colors"
+              title="Dashboard Admin"
+            >
+              <ShieldAlert className="w-5 h-5" />
+            </button>
+          )}
           <button 
-            onClick={handleOpenKeyDialog}
-            className="md:hidden p-2 text-neutral-400 hover:text-white transition-colors"
+            onClick={handleNewChat}
+            className="md:hidden p-2 text-emerald-500 hover:text-emerald-400 transition-colors"
+            title="Novo Chat"
           >
-            <Settings className="w-5 h-5" />
+            <Plus className="w-5 h-5" />
+          </button>
+          <button 
+            onClick={handleLogout}
+            className="md:hidden p-2 text-red-400 hover:text-red-300 transition-colors"
+          >
+            <LogOut className="w-5 h-5" />
           </button>
         </div>
       </header>
 
-      <main className="flex h-[calc(100vh-64px)] md:h-[calc(100vh-64px)] overflow-hidden relative">
-        {/* Main Content: 3-Column System */}
-        <div className="flex-1 flex overflow-hidden relative">
+      {currentView === 'admin' && isAdmin ? (
+        <AdminDashboard />
+      ) : (
+        <>
+          <main className="flex h-[calc(100vh-64px)] md:h-[calc(100vh-64px)] overflow-hidden relative">
+            {/* Main Content: 3-Column System */}
+            <div className="flex-1 flex overflow-hidden relative">
           {/* Column 1: Brand & Settings (Left) */}
           <aside className={`
             fixed inset-0 z-40 bg-neutral-950 md:relative md:inset-auto md:z-0
@@ -456,7 +605,7 @@ export default function App() {
                   </button>
                   <span className="text-xs font-mono font-bold w-4 text-center">{quantity}</span>
                   <button 
-                    onClick={() => setQuantity(Math.min(4, quantity + 1))}
+                    onClick={() => setQuantity(Math.min(2, quantity + 1))}
                     className="text-neutral-400 hover:text-white"
                   >
                     +
@@ -471,6 +620,11 @@ export default function App() {
             flex-1 flex flex-col relative bg-neutral-950 border-r border-neutral-800
             ${mobileTab === "chat" ? "flex" : "hidden md:flex"}
           `}>
+            {state.error && (
+              <div className="bg-red-500/10 border-b border-red-500/20 text-red-400 p-4 text-sm text-center">
+                {state.error}
+              </div>
+            )}
             <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
               <div className="max-w-2xl mx-auto space-y-6">
                 {state.chatHistory.map((msg, idx) => (
@@ -485,11 +639,17 @@ export default function App() {
                         ? "bg-emerald-500 text-neutral-950 font-medium rounded-tr-none" 
                         : "bg-neutral-900 border border-neutral-800 text-neutral-200 rounded-tl-none"
                     }`}>
-                      {msg.text.split("\n").map((line, i) => (
-                        <p key={i} className={i > 0 ? "mt-2" : ""}>
-                          {line.replace("[READY_TO_GENERATE]", "🚀 Preparando seu anúncio...")}
-                        </p>
-                      ))}
+                      {(() => {
+                        let textToShow = msg.text;
+                        if (textToShow.includes("[READY_TO_GENERATE]")) {
+                          textToShow = textToShow.split("[READY_TO_GENERATE]")[0] + "\n\n🚀 Preparando seu anúncio...";
+                        }
+                        return textToShow.split("\n").map((line, i) => (
+                          <p key={i} className={i > 0 ? "mt-2" : ""}>
+                            {line}
+                          </p>
+                        ));
+                      })()}
                     </div>
                   </motion.div>
                 ))}
@@ -665,8 +825,10 @@ export default function App() {
               <span>v1.0.0</span>
             </div>
           </footer>
+        </>
+      )}
 
-          <style>{`
+      <style>{`
         @keyframes shimmer {
           100% { transform: translateX(100%); }
         }
