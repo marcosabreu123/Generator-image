@@ -104,18 +104,38 @@ export class GeminiService {
    */
   async chat(message: string, history: ChatMessage[], guidelines: BrandGuidelines | null): Promise<string> {
     const ai = this.getClient();
+    
+    const formattedHistory: any[] = [];
+    for (const m of history) {
+      if (formattedHistory.length === 0) {
+        if (m.role === "user") {
+          formattedHistory.push({ role: "user", parts: [{ text: m.text }] });
+        }
+      } else {
+        const last = formattedHistory[formattedHistory.length - 1];
+        if (last.role === m.role) {
+          last.parts[0].text += `\n\n${m.text}`;
+        } else {
+          formattedHistory.push({ role: m.role, parts: [{ text: m.text }] });
+        }
+      }
+    }
+
+    let finalMessage = message;
+    if (formattedHistory.length > 0 && formattedHistory[formattedHistory.length - 1].role === "user") {
+      const lastUser = formattedHistory.pop();
+      finalMessage = `${lastUser.parts[0].text}\n\n${finalMessage}`;
+    }
+
     const chat = ai.chats.create({
       model: "gemini-3-flash-preview",
       config: {
         systemInstruction: ASSISTANT_SYSTEM_INSTRUCTION + (guidelines ? `\n[DIRETRIZES DA MARCA ATUAIS]: ${JSON.stringify(guidelines)}` : ""),
       },
-      history: history.map(m => ({
-        role: m.role,
-        parts: [{ text: m.text }]
-      }))
+      history: formattedHistory
     });
 
-    const response = await chat.sendMessage({ message });
+    const response = await chat.sendMessage({ message: finalMessage });
     return response.text || "Desculpe, tive um problema ao processar sua mensagem.";
   }
 
