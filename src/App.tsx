@@ -215,7 +215,7 @@ export default function App() {
       }
     } catch (err: any) {
       console.error(err);
-      setState(prev => ({ ...prev, error: "Erro ao conversar com o assistente." }));
+      setState(prev => ({ ...prev, error: `Erro ao conversar com o assistente: ${err.message || "Verifique sua API Key."}` }));
     }
   };
 

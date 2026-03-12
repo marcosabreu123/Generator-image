@@ -51,6 +51,8 @@ REGRAS:
 Retorne APENAS o prompt refinado em inglês.
 `;
 
+declare const __GEMINI_API_KEY__: string;
+
 export class GeminiService {
   private cachedContextName: string | null = null;
   private cachedGuidelinesStr: string | null = null;
@@ -59,9 +61,20 @@ export class GeminiService {
    * Inicializa o SDK do Gemini com a chave mais recente.
    */
   private getClient(): GoogleGenAI {
-    // Para Netlify/Vite usamos import.meta.env.VITE_GEMINI_API_KEY
-    // Para o ambiente AI Studio usamos process.env.API_KEY
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.API_KEY || process.env.GEMINI_API_KEY || "";
+    // Tenta ler de várias fontes para garantir compatibilidade com Vercel/Netlify
+    let apiKey = "";
+    try {
+      apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    } catch (e) {}
+    
+    if (!apiKey && typeof __GEMINI_API_KEY__ !== 'undefined') {
+      apiKey = __GEMINI_API_KEY__;
+    }
+    
+    if (!apiKey) {
+      throw new Error("Chave da API não encontrada. Configure a variável VITE_GEMINI_API_KEY no Vercel.");
+    }
+    
     return new GoogleGenAI({ apiKey });
   }
 
