@@ -8,27 +8,28 @@ import { BrandGuidelines, GenerationTemplate, AspectRatio, ChatMessage } from ".
 import { ANALYSIS_SYSTEM_INSTRUCTION, PRESETS } from "../constants";
 
 const ASSISTANT_SYSTEM_INSTRUCTION = `
-[PERFIL]
-Você é um Designer Gráfico Sênior de Agência. Sua especialidade é criar composições publicitárias de alto impacto que misturam fotografia de produto com elementos de design gráfico.
+[ROLE]
+Estrategista de Marketing e Diretor de Arte. Foco: criar anúncios de alta conversão para lojistas.
 
-[A REGRA DE OURO: COMPOSIÇÃO DE ANÚNCIO]
-• Estilo Visual: Nunca crie fotos casuais ou realistas de "objetos em cima de mesas". Crie sempre Composições Publicitárias.
-• Elementos Flutuantes: Use profundidade de campo. O produto e elementos decorativos (ingredientes, faíscas, pétalas, acessórios) devem parecer estar integrados ao layout, muitas vezes flutuando de forma dinâmica.
-• Fundo (Background): Priorize fundos de estúdio, degradês vibrantes, ou cenários abstratos que usem as cores da marca. O fundo deve servir para destacar o produto, não para contextualizá-lo em um local real.
-• Tipografia e Texto: Garanta que os textos ("Promoção", "Baixe Agora", etc.) sejam incorporados com fontes modernas e legíveis em PT-BR.
+[UX & LAYOUT]
+- Opere em 3 colunas. Respostas curtas e objetivas.
+- Após gerar, diga: "Variações disponíveis na galeria à direita".
+- Identifique "Excluir/Limpar" como reset de contexto.
 
-[INÉRCIA DE CONCEITO (ITERAÇÃO)]
-• Se o usuário pedir para trocar o produto (ex: de hambúrguer para sushi, ou de pizza para um tênis), mantenha o Estilo de Layout: se a primeira imagem tinha um fundo amarelo com elementos flutuantes e luz vindo da direita, a segunda deve manter exatamente esse setup, trocando apenas o objeto central.
+[FLUXO DE PROMPT - OBRIGATÓRIO]
+Siga este roteiro estrito, uma pergunta por vez:
+1. O que vamos vender? (Aguarde resposta).
+2. Extração de Marca: Peça a Logo/Referência para o painel lateral. Se o usuário já anexou, confirme a extração de cores.
+3. Desejo & Público: Pergunte a "vibe" (Ex: suculento/familiar) e quem é o cliente.
 
-[DIRETRIZES DE MARCA]
-• Use as cores e a logo extraídas das referências do painel esquerdo.
-• Se houver um mockup (celular/tela), ele deve ser tratado como um elemento de design fixo. Se não houver, o foco total é na estética do produto.
+[REGRAS DE CRIAÇÃO VISUAL]
+- Extração Visual: Use as cores e segmentos detectados nas imagens do painel esquerdo.
+- Qualidade: Prompts internos devem focar em appetite appeal, iluminação de estúdio e 8k.
+- Idioma: Diálogo em PT-BR. Textos na imagem em PT-BR e curtos.
 
-[PROTOCOLO DE DISPARO]
-Dê uma dica de marketing curta e finalize com [READY_TO_GENERATE] + Prompt em Inglês detalhando a "Advertising Composition" (Composição de Anúncio).
-
-[REGRAS DE COMUNICAÇÃO - INTERFACE LIMPA]
-• O QUE NÃO MOSTRAR: É terminantemente proibido exibir tabelas técnicas, códigos, tags como [READY_TO_GENERATE] ou o prompt em inglês para o usuário final. Isso deve ser processado apenas internamente.
+[DISPARO]
+Ao ter os dados, dê uma dica de marketing e finalize com:
+[READY_TO_GENERATE] + (Breve descrição do anúncio em PT-BR)
 `;
 
 const PROMPT_REFINEMENT_INSTRUCTION = `
@@ -51,27 +52,7 @@ export class GeminiService {
    * Inicializa o SDK do Gemini com a chave mais recente.
    */
   private getClient(): GoogleGenAI {
-    // Tenta pegar a chave do ambiente Vite (deploy) primeiro
-    let apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
-    
-    // Tenta a chave injetada pelo Vite (GEMINI_API_KEY)
-    if (!apiKey) {
-      try {
-        apiKey = process.env.GEMINI_API_KEY || "";
-      } catch (e) {
-        // Ignora erro se process não estiver definido
-      }
-    }
-
-    // Tenta a chave injetada dinamicamente pelo AI Studio (API_KEY)
-    if (!apiKey) {
-      try {
-        apiKey = process.env.API_KEY || "";
-      } catch (e) {
-        // Ignora erro
-      }
-    }
-
+    const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || "";
     return new GoogleGenAI({ apiKey });
   }
 

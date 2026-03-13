@@ -29,9 +29,7 @@ Analise a imagem de referência fornecida e extraia as seguintes informações:
 1. Paleta de cores primárias em formato HEX (até 3 cores).
 2. Estilo de fonte dominante (serif, sans-serif, script, display, etc.).
 3. O segmento de mercado provável (ex: alimentício, automotivo, moda, tech).
-4. Qualquer texto legível presente na imagem (ex: slogans, promoções, títulos).
-5. A "vibe" ou abordagem geral do anúncio (ex: luxuoso, descontraído, urgente, minimalista).
 
-Retorne APENAS um objeto JSON com as chaves: "colors" (array de strings), "fontStyle" (string), "segment" (string), "extractedText" (array de strings) e "vibe" (string).
-Exemplo: {"colors": ["#FF0000", "#FFFFFF"], "fontStyle": "sans-serif", "segment": "tech", "extractedText": ["Promoção de Verão", "50% OFF"], "vibe": "urgente e vibrante"}
+Retorne APENAS um objeto JSON com as chaves: "colors" (array de strings), "fontStyle" (string) e "segment" (string).
+Exemplo: {"colors": ["#FF0000", "#FFFFFF"], "fontStyle": "sans-serif", "segment": "tech"}
 `;
