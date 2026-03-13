@@ -52,14 +52,14 @@ export class GeminiService {
    * Inicializa o SDK do Gemini com a chave mais recente.
    */
   private getClient(): GoogleGenAI {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.API_KEY || process.env.GEMINI_API_KEY || "";
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "";
     return new GoogleGenAI({ apiKey });
   }
 
   /**
    * Conversa com o assistente de marketing.
    */
-  async chat(message: string, history: ChatMessage[], guidelines: BrandGuidelines | null): Promise<string> {
+  async chat(message: string, history: ChatMessage[], guidelines: BrandGuidelines | null, onChunk?: (text: string) => void): Promise<string> {
     const ai = this.getClient();
     const chat = ai.chats.create({
       model: "gemini-3-flash-preview",
@@ -72,8 +72,21 @@ export class GeminiService {
       }))
     });
 
-    const response = await chat.sendMessage({ message });
-    return response.text || "Desculpe, tive um problema ao processar sua mensagem.";
+    if (onChunk) {
+      let fullText = "";
+      const responseStream = await chat.sendMessageStream({ message });
+      for await (const chunk of responseStream) {
+        const c = chunk as any;
+        if (c.text) {
+          fullText += c.text;
+          onChunk(fullText);
+        }
+      }
+      return fullText || "Desculpe, tive um problema ao processar sua mensagem.";
+    } else {
+      const response = await chat.sendMessage({ message });
+      return response.text || "Desculpe, tive um problema ao processar sua mensagem.";
+    }
   }
 
   /**
