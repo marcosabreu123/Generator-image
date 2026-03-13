@@ -51,7 +51,27 @@ export class GeminiService {
    * Inicializa o SDK do Gemini com a chave mais recente.
    */
   private getClient(): GoogleGenAI {
-    const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || "";
+    // Tenta pegar a chave do ambiente Vite (deploy) primeiro
+    let apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
+    
+    // Tenta a chave injetada pelo Vite (GEMINI_API_KEY)
+    if (!apiKey) {
+      try {
+        apiKey = process.env.GEMINI_API_KEY || "";
+      } catch (e) {
+        // Ignora erro se process não estiver definido
+      }
+    }
+
+    // Tenta a chave injetada dinamicamente pelo AI Studio (API_KEY)
+    if (!apiKey) {
+      try {
+        apiKey = process.env.API_KEY || "";
+      } catch (e) {
+        // Ignora erro
+      }
+    }
+
     return new GoogleGenAI({ apiKey });
   }
 
