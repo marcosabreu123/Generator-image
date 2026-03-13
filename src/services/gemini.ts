@@ -52,7 +52,7 @@ export class GeminiService {
    * Inicializa o SDK do Gemini com a chave mais recente.
    */
   private getClient(): GoogleGenAI {
-    const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || "";
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.API_KEY || process.env.GEMINI_API_KEY || "";
     return new GoogleGenAI({ apiKey });
   }
 

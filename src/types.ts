@@ -13,6 +13,8 @@ export interface BrandGuidelines {
   colors: string[];
   fontStyle: string;
   segment: string;
+  extractedText?: string[];
+  vibe?: string;
 }
 
 export interface GeneratedImage {
