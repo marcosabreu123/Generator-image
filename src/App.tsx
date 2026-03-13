@@ -177,7 +177,9 @@ export default function App() {
     try {
       if (!geminiService.current) geminiService.current = new GeminiService();
       
-      const response = await geminiService.current.chat(userMessage, updatedHistory, guidelines);
+      // Pass state.chatHistory (which doesn't have the new user message yet) 
+      // so the API receives alternating roles correctly.
+      const response = await geminiService.current.chat(userMessage, state.chatHistory, guidelines);
       
       let displayText = response;
       let promptForGeneration = "";
@@ -503,6 +505,18 @@ export default function App() {
                     </div>
                   </motion.div>
                 ))}
+                {state.error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex justify-center"
+                  >
+                    <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl text-sm flex items-center gap-2 max-w-[85%]">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                      <p>{state.error}</p>
+                    </div>
+                  </motion.div>
+                )}
                 <div ref={chatEndRef} />
               </div>
             </div>
