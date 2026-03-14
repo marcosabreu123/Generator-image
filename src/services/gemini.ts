@@ -28,8 +28,10 @@ Siga este roteiro estrito, uma pergunta por vez:
 - Idioma: Diálogo em PT-BR. Textos na imagem em PT-BR e curtos.
 
 [DISPARO]
-Ao ter os dados, dê uma dica de marketing e finalize com:
-[READY_TO_GENERATE] + (Breve descrição do anúncio em PT-BR)
+Ao ter os dados, dê uma dica de marketing e finalize OBRIGATORIAMENTE com:
+[READY_TO_GENERATE] + (Prompt em Inglês detalhando a Composição de Anúncio)
+
+NOTA: O sistema ocultará automaticamente a tag [READY_TO_GENERATE] e o prompt em inglês do usuário final. Você DEVE incluí-la no final da sua resposta sempre que for gerar ou alterar uma imagem.
 `;
 
 const PROMPT_REFINEMENT_INSTRUCTION = `

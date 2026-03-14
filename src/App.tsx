@@ -186,11 +186,21 @@ export default function App() {
       const response = await geminiService.current.chat(userMessage, updatedHistory, guidelines, (chunk) => {
         setState(prev => {
           const newHistory = [...prev.chatHistory];
-          newHistory[newHistory.length - 1] = { role: "model", text: chunk };
+          // Oculta a tag de geração e o prompt do usuário
+          const displayChunk = chunk.split("[READY_TO_GENERATE]")[0].trim();
+          newHistory[newHistory.length - 1] = { role: "model", text: displayChunk };
           return { ...prev, chatHistory: newHistory };
         });
       });
       
+      // Atualiza o histórico final para garantir que a tag não apareça
+      setState(prev => {
+        const newHistory = [...prev.chatHistory];
+        const displayText = response.split("[READY_TO_GENERATE]")[0].trim();
+        newHistory[newHistory.length - 1] = { role: "model", text: displayText };
+        return { ...prev, chatHistory: newHistory };
+      });
+
       // Verificar se o assistente está pronto para gerar
       if (response.includes("[READY_TO_GENERATE]")) {
         const promptForGeneration = response.split("[READY_TO_GENERATE]")[1].trim();
